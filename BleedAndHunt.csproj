@@ -37,10 +37,6 @@
       <HintPath>$(VSDir)\Lib\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>$(VSDir)\Lib\0Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
   </ItemGroup>
 
   <ItemGroup>

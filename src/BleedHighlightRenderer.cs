@@ -1,5 +1,5 @@
 using System;
-using System.Linq;
+using System.Collections.Generic;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -19,6 +19,11 @@ namespace BleedAndHunt
         private static readonly Vec3f FullAmbient = new Vec3f(1.0f, 1.0f, 1.0f);
         private readonly Vec4f livingTint = new Vec4f();
         private readonly Vec4f corpseTint = new Vec4f();
+
+        // High-performance target buffers (updated at low frequency 5 Hz instead of 60-144 Hz)
+        private readonly List<Entity> livingTargets = new List<Entity>(16);
+        private readonly List<Entity> corpseTargets = new List<Entity>(16);
+        private float scanAccumulator = 0.20f; // Scan immediately on start
 
         public double RenderOrder => 0.99;
         public int RenderRange => 150;
@@ -65,6 +70,17 @@ namespace BleedAndHunt
             IClientPlayer? player = capi.World.Player;
             if (player?.Entity == null) return;
 
+            // Low-frequency target scan (5 times/sec): eliminates 95% of dictionary lookups and entity iterations
+            scanAccumulator += deltaTime;
+            if (scanAccumulator >= 0.20f)
+            {
+                scanAccumulator = 0f;
+                ScanTrackedTargets(player, config);
+            }
+
+            // ZERO-COST IDLE: When player has no wounded targets, skip all OpenGL operations entirely!
+            if (livingTargets.Count == 0 && corpseTargets.Count == 0) return;
+
             // Ensure white texture is valid
             if (whiteTexture == null || whiteTexture.TextureId <= 0)
             {
@@ -72,7 +88,6 @@ namespace BleedAndHunt
                 capi.Render.LoadOrUpdateTextureFromRgba(new int[] { unchecked((int)0xFFFFFFFF) }, false, 0, ref whiteTexture);
             }
 
-            string myUid = player.PlayerUID;
             Vec3d camPos = player.Entity.CameraPos;
             float maxDist = config.XRayMaxDistance;
             float maxDistSq = maxDist * maxDist;
@@ -84,58 +99,28 @@ namespace BleedAndHunt
                 capi.Render.GLDisableDepthTest();
                 capi.Render.GLDepthMask(false);
 
-                // Iterate loaded entities safely
-                var entities = capi.World.LoadedEntities.Values;
-                int renderedCount = 0;
-
-                foreach (var entity in entities)
+                // Render only active living targets (typically 0-2 targets)
+                for (int i = 0; i < livingTargets.Count; i++)
                 {
-                    if (renderedCount >= 16) break; // Hard cap on simultaneously highlighted targets
+                    Entity entity = livingTargets[i];
+                    if (entity?.Pos == null || !entity.Alive) continue;
+
+                    float distSq = (float)entity.Pos.SquareDistanceTo(player.Entity.Pos);
+                    if (distSq > maxDistSq) continue;
+
+                    RenderLivingHighlight(entity, camPos, distSq, config);
+                }
+
+                // Render only active corpse beacons (typically 0-1 targets)
+                for (int i = 0; i < corpseTargets.Count; i++)
+                {
+                    Entity entity = corpseTargets[i];
                     if (entity?.Pos == null) continue;
-                    if (entity.EntityId == player.Entity.EntityId) continue;
 
-                    try
-                    {
-                        // 1. Distance culling
-                        float distSq = (float)entity.Pos.SquareDistanceTo(player.Entity.Pos);
-                        if (distSq > maxDistSq) continue;
+                    float distSq = (float)entity.Pos.SquareDistanceTo(player.Entity.Pos);
+                    if (distSq > maxDistSq) continue;
 
-                        // 2. Only highlight targets wounded by THIS player
-                        string hunterUid = entity.WatchedAttributes?.GetString("bleedHunterUid", "") ?? "";
-                        if (hunterUid != myUid) continue;
-
-                        // 3. Check target category filter (animals, monsters, all)
-                        bool isAnimal = entity.WatchedAttributes?.GetBool("bleedIsAnimal", false) ?? false;
-                        if (!isAnimal)
-                        {
-                            isAnimal = EntityHelper.IsAnimal(entity);
-                        }
-
-                        string filter = config.XRayTargetFilter?.ToLowerInvariant() ?? "animals";
-                        if (filter == "animals" && !isAnimal) continue;
-                        if (filter == "monsters" && isAnimal) continue;
-
-                        bool isDead = !entity.Alive || (entity.WatchedAttributes?.GetBool("bleedIsDead", false) ?? false);
-                        float secondsLeft = entity.WatchedAttributes?.GetFloat("bleedSecondsLeft", 0f) ?? 0f;
-                        float deadSecondsLeft = entity.WatchedAttributes?.GetFloat("bleedDeadSecondsLeft", 0f) ?? 0f;
-
-                        // Living target: active for 30s from last strike
-                        if (!isDead && secondsLeft > 0f)
-                        {
-                            RenderLivingHighlight(entity, camPos, distSq, config);
-                            renderedCount++;
-                        }
-                        // Downed corpse: upper beacon active for 10s after death to find kill
-                        else if (isDead && deadSecondsLeft > 0f)
-                        {
-                            RenderCorpseBeacon(entity, camPos, config);
-                            renderedCount++;
-                        }
-                    }
-                    catch
-                    {
-                        // Per-entity safe fallback: error on one entity never breaks other highlights
-                    }
+                    RenderCorpseBeacon(entity, camPos, config);
                 }
             }
             catch
@@ -146,6 +131,60 @@ namespace BleedAndHunt
             {
                 capi.Render.GLEnableDepthTest();
                 capi.Render.GLDepthMask(true);
+            }
+        }
+
+        private void ScanTrackedTargets(IClientPlayer player, ModConfig config)
+        {
+            livingTargets.Clear();
+            corpseTargets.Clear();
+
+            string myUid = player.PlayerUID;
+            float maxDist = config.XRayMaxDistance;
+            float maxDistSq = maxDist * maxDist;
+            string filter = config.XRayTargetFilter?.ToLowerInvariant() ?? "animals";
+
+            var entities = capi.World.LoadedEntities.Values;
+            int totalFound = 0;
+
+            foreach (var entity in entities)
+            {
+                if (totalFound >= 16) break;
+                if (entity?.Pos == null) continue;
+                if (entity.EntityId == player.Entity.EntityId) continue;
+
+                // 1. Distance culling (fast reject)
+                float distSq = (float)entity.Pos.SquareDistanceTo(player.Entity.Pos);
+                if (distSq > maxDistSq) continue;
+
+                // 2. Only highlight targets wounded by THIS player
+                string hunterUid = entity.WatchedAttributes?.GetString("bleedHunterUid", "") ?? "";
+                if (hunterUid != myUid) continue;
+
+                // 3. Category filter
+                bool isAnimal = entity.WatchedAttributes?.GetBool("bleedIsAnimal", false) ?? false;
+                if (!isAnimal)
+                {
+                    isAnimal = EntityHelper.IsAnimal(entity);
+                }
+
+                if (filter == "animals" && !isAnimal) continue;
+                if (filter == "monsters" && isAnimal) continue;
+
+                bool isDead = !entity.Alive || (entity.WatchedAttributes?.GetBool("bleedIsDead", false) ?? false);
+                float secondsLeft = entity.WatchedAttributes?.GetFloat("bleedSecondsLeft", 0f) ?? 0f;
+                float deadSecondsLeft = entity.WatchedAttributes?.GetFloat("bleedDeadSecondsLeft", 0f) ?? 0f;
+
+                if (!isDead && secondsLeft > 0f)
+                {
+                    livingTargets.Add(entity);
+                    totalFound++;
+                }
+                else if (isDead && deadSecondsLeft > 0f)
+                {
+                    corpseTargets.Add(entity);
+                    totalFound++;
+                }
             }
         }
 
@@ -268,6 +307,9 @@ namespace BleedAndHunt
 
         public void Dispose()
         {
+            livingTargets.Clear();
+            corpseTargets.Clear();
+
             if (boxMeshRef != null)
             {
                 capi.Render.DeleteMesh(boxMeshRef);

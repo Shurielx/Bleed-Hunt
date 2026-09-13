@@ -155,28 +155,5 @@ namespace BleedAndHunt
 
         /// <summary>Entity code substrings considered bosses, immune to limping slowdown.</summary>
         public string[] BossCodes { get; set; } = new string[] { "erel", "eidolon" };
-
-        // Realistic Stealth & Sensory System (v1.1.0)
-
-        /// <summary>Enables realistic snout-based stealth FOV cone and raycast line-of-sight detection.</summary>
-        public bool EnableStealthMechanics { get; set; } = true;
-
-        /// <summary>Field of view cone in front of the animal's snout in degrees (default: 130° = 65° half-angle on each side).</summary>
-        public float StealthFovDegrees { get; set; } = 130.0f;
-
-        /// <summary>Proximity sound/smell hearing radius when the player is sneaking on Shift (default: 2.5 blocks).</summary>
-        public float SneakHearingRadius { get; set; } = 2.5f;
-
-        /// <summary>Proximity hearing radius when the player is walking upright (default: 6.5 blocks).</summary>
-        public float WalkHearingRadius { get; set; } = 6.5f;
-
-        /// <summary>Proximity hearing radius when the player is sprinting or jumping (default: 14.0 blocks).</summary>
-        public float SprintHearingRadius { get; set; } = 14.0f;
-
-        /// <summary>Visual detection distance multiplier when sneaking inside the forward FOV cone (default: 0.55 = 55% of base range).</summary>
-        public float SneakSightRangeMultiplier { get; set; } = 0.55f;
-
-        /// <summary>Enables raycasting to check if solid terrain, walls, or tree trunks block line of sight to the player.</summary>
-        public bool EnableLineOfSightRaycast { get; set; } = true;
     }
 }

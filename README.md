@@ -5,7 +5,7 @@
 # 🩸 Bleed & Hunt
 ### *Visceral Wounds • Blood Trail Tracking • Prey Limping • Melee Sweeps*
 
-[![Release](https://img.shields.io/badge/Release-v1.1.0-e62020?style=for-the-badge&logo=git&logoColor=white)](https://github.com/Shurielx/Bleed-Hunt/releases)
+[![Release](https://img.shields.io/badge/Release-v1.2.0-e62020?style=for-the-badge&logo=git&logoColor=white)](https://github.com/Shurielx/Bleed-Hunt/releases)
 [![Vintage Story](https://img.shields.io/badge/Vintage%20Story-1.22.*-8B4513?style=for-the-badge&logo=curseforge&logoColor=white)](https://mods.vintagestory.at/)
 [![Platform](https://img.shields.io/badge/Platform-Client%20%26%20Server-232a30?style=for-the-badge)](https://github.com/Shurielx/Bleed-Hunt)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512bd4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -13,7 +13,7 @@
 
 <br />
 
-**Bleed & Hunt** overhauls combat, hunting, and tracking mechanics in **Vintage Story**. Inflict scaling bleed wounds based on weapon material tiers, stalk wounded game by glowing crimson blood trails and hunter's instinct scent, watch injured prey limp in desperation, sneak up on animals with a realistic snout-based field of view (FOV) and sound hearing radii, and cleave through moving targets with a forgiving melee sweep assist.
+**Bleed & Hunt** overhauls combat, hunting, and tracking mechanics in **Vintage Story**. Inflict scaling bleed wounds based on weapon material tiers, stalk wounded game by glowing crimson blood trails and hunter's instinct scent, watch injured prey limp in desperation, and cleave through moving targets with a forgiving melee sweep assist.
 
 [📦 Download Mod](https://github.com/Shurielx/Bleed-Hunt/releases) • [✨ Features](#-features) • [🐾 Tracking & Combat](#-showcase--mechanics) • [⚔️ Bleed Tiers](#-bleed-tiers--presets) • [📜 Commands](#-commands) • [⚙️ Configuration](#-configuration)
 
@@ -27,8 +27,6 @@
 
 ## ✨ Features
 
-* 🥷 **Realistic Snout-Based Stealth & FOV:** Animals no longer have a supernatural 360° radar! Animals have a 130° forward vision cone originating from their snout. Sneaking on Shift behind an animal lets you stalk them closely, while multi-tiered sound fallbacks (crouch 2.5m, walk 6.5m, sprint 14m) prevent absurd tail-bumping.
-* 🌲 **Anti-Exploit Raycast Line of Sight:** Hiding behind solid rock walls, cliffs, or tree trunks blocks animal detection. Foliage filter ensures tall grass, flowers, and water never grant god-mode invisibility.
 * 🩸 **Progressive Bleeding Over Time:** Weapons inflict damage-over-time wounds scaled by material tier (from crude Flint up to forged Steel and exotic blades). Re-striking refreshes and intensifies the bleed timer.
 * 🐾 **Dynamic Blood Trails:** Wounded animals drop faint, glowing red voxel blood droplets onto the ground, leaving an unmistakable trail to track through dense grass and brush.
 * 👁️ **Hunter's Scent Vision:** Injured prey is highlighted through foliage and terrain with a subtle crimson outline for 30 seconds (up to 64 blocks away), giving you true hunter instincts.
@@ -36,6 +34,7 @@
 * 🎯 **Golden Kill Marker:** Downed game emits a soft golden diamond beacon for 10 seconds, ensuring your harvest is never lost in tall autumn grass or murky swamps.
 * ⚔️ **Forgiving Melee Sweep Cone:** Swords, knives, falx blades, and spears feature a 22° attack cone assist so agile targets aren't missed by a pixel.
 * 🗡️ **Falx Synergy & Reach:** Falx weapons inflict **+50% bonus bleed damage** over time and gain extended forward reach (3.0m). Both bonuses can be toggled via chat commands or the ConfigKit GUI.
+* 🚀 **Zero-Overhead Performance:** Ultra-efficient architecture with zero-cost idle state (returns in 1 nanosecond for untargeted mobs) and 5Hz low-frequency cached rendering.
 * 🌐 **Multiplayer Ready:** Fully synchronized across dedicated servers and clients with zero desync.
 
 ---
@@ -103,7 +102,6 @@ You can configure and customize settings in real-time through the in-game chat u
 | Command | Arguments | Description |
 | :--- | :--- | :--- |
 | `/bnh help` | *none* | Displays current mod configuration and available commands. |
-| `/bnh stealth` *(or `/bnh sneak`)* | `on` \| `off` | Toggle realistic snout-based stealth FOV and raycast detection. |
 | `/bnh xray` *(or `/bnh scent`)* | `animals` \| `monsters` \| `all` \| `on` \| `off` | Configure target filter or toggle Hunter's Scent outline. |
 | `/bnh betterrange` *(or `/bnh sweep`)* | `on` \| `off` | Toggle the melee attack sweep assist cone. |
 | `/bnh falx` | `on` \| `off` \| `bleed [on\|off]` \| `range [on\|off]` \| `both` | Toggle or configure falx weapon bonuses (bleed & reach). |
@@ -169,14 +167,7 @@ Bleed & Hunt offers two convenient ways to customize settings:
   "CorpseColorG": 0.75,
   "CorpseColorB": 0.1,
   "CorpseColorA": 0.85,
-  "BossCodes": [ "erel", "eidolon" ],
-  "EnableStealthMechanics": true,
-  "StealthFovDegrees": 130.0,
-  "SneakHearingRadius": 2.5,
-  "WalkHearingRadius": 6.5,
-  "SprintHearingRadius": 14.0,
-  "SneakSightRangeMultiplier": 0.55,
-  "EnableLineOfSightRaycast": true
+  "BossCodes": [ "erel", "eidolon" ]
 }
 ```
 

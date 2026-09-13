@@ -3,8 +3,8 @@
   "modid": "bleedandhunt",
   "name": "Bleed & Hunt",
   "authors": ["Shuriel"],
-  "description": "Hunting and combat overhaul: weapon-tier bleeding damage over time, wounded animal limping, hunter's blood scent tracking, extended reach for falx blades, and realistic snout-based stealth FOV & raycast detection.",
-  "version": "1.1.1",
+  "description": "Hunting and combat overhaul: weapon-tier bleeding damage over time, wounded animal limping, hunter's blood scent tracking, melee sweep cone assist, and extended reach for falx blades.",
+  "version": "1.2.0",
   "dependencies": {
     "game": "1.22.*"
   }
