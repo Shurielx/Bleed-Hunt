@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>BleedAndHunt</AssemblyName>
+    <RootNamespace>BleedAndHunt</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VSDir Condition="'$(VSDir)' == '' and '$(OS)' == 'Windows_NT'">$(APPDATA)\Vintagestory</VSDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="VintagestoryAPI">
+      <HintPath>$(VSDir)\VintagestoryAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="VintagestoryLib">
+      <HintPath>$(VSDir)\VintagestoryLib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="VSSurvivalMod">
+      <HintPath>$(VSDir)\Mods\VSSurvivalMod.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="VSEssentials">
+      <HintPath>$(VSDir)\Mods\VSEssentials.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(VSDir)\Lib\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="modinfo.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="modicon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="PackageMod" AfterTargets="Build">
+    <PropertyGroup>
+      <ReleasesDir>$(ProjectDir)releases</ReleasesDir>
+      <VsModsDir Condition="'$(VsModsDir)' == '' and '$(OS)' == 'Windows_NT'">$(APPDATA)\VintagestoryData\Mods</VsModsDir>
+      <ModZipName>BleedAndHunt.zip</ModZipName>
+      <ZipOut>$(ReleasesDir)\$(ModZipName)</ZipOut>
+    </PropertyGroup>
+    <MakeDir Directories="$(ReleasesDir)" />
+    <Delete Files="$(ZipOut)" Condition="Exists('$(ZipOut)')" />
+    <Exec Command="tar.exe -a -c -f &quot;$(ZipOut)&quot; -C &quot;$(TargetDir.TrimEnd('\'))&quot; $(TargetName).dll $(TargetName).pdb $(TargetName).xml modinfo.json modicon.png" />
+    <!-- Remove any obsolete version-stamped zips in Mods to prevent duplicates -->
+    <ItemGroup>
+      <OldZips Include="$(VsModsDir)\BleedAndHunt_v*.zip" />
+    </ItemGroup>
+    <Delete Files="@(OldZips)" Condition="'$(VsModsDir)' != '' and Exists('$(VsModsDir)')" />
+    <!-- Deploy BleedAndHunt.zip to Vintage Story Mods folder -->
+    <Copy SourceFiles="$(ZipOut)" DestinationFolder="$(VsModsDir)" Condition="'$(VsModsDir)' != '' and Exists('$(VsModsDir)')" />
+  </Target>
+
+</Project>

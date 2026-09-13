@@ -1,0 +1,21 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+releases/*.zip
+
+# IDE and Editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary scratch files
+scratch/
