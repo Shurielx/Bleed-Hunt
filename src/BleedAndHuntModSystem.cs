@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -16,6 +17,7 @@ namespace BleedAndHunt
         public static BleedAndHuntModSystem? Instance { get; private set; }
         private BleedHighlightRenderer? highlightRenderer;
         private WeaponSweepSystem? weaponSweep;
+        private Harmony? harmony;
         private ICoreAPI? coreApi;
 
         public override double ExecuteOrder() => 0.015;
@@ -81,6 +83,11 @@ namespace BleedAndHunt
                 .BeginSubCommand("falx")
                     .WithDescription("Configure falx bonuses: /bnh falx [bleed|range|both] [on|off]")
                     .HandleWith(OnBnhFalx)
+                .EndSubCommand()
+                .BeginSubCommand("stealth")
+                    .WithDescription("Configure realistic sneaking & animal FOV: /bnh stealth [on|off]")
+                    .WithAlias("sneak")
+                    .HandleWith(OnBnhStealth)
                 .EndSubCommand();
         }
 
@@ -96,14 +103,17 @@ namespace BleedAndHunt
             string bleedState = Config.EnableBleeding ? Config.BleedingPreset.ToUpperInvariant() : "OFF";
             string falxBleedState = Config.EnableFalxBleedBonus ? "ON" : "OFF";
             string falxRangeState = Config.EnableFalxRangeBoost ? "ON" : "OFF";
+            string stealthState = Config.EnableStealthMechanics ? "ON" : "OFF";
             int opacityPercent = (int)Math.Round(Config.XRayColorA * 100f);
 
-            string msg = $"[Bleed & Hunt v1.0.0] Settings & Status:\n" +
+            string msg = $"[Bleed & Hunt v1.1.0] Settings & Status:\n" +
                          $"• Hunter's Scent: {xrayState} (Targeting: {Config.XRayTargetFilter}, Range: {Config.XRayMaxDistance}m, Opacity: {opacityPercent}%)\n" +
+                         $"• Realistic Stealth: {stealthState} (Cone: {Config.StealthFovDegrees}°, Crouch Hearing: {Config.SneakHearingRadius}m, Raycast: {(Config.EnableLineOfSightRaycast ? "ON" : "OFF")})\n" +
                          $"• Melee Sweep: {rangeState} (Assist Angle: {Config.BetterRangeSweepAngle}°)\n" +
                          $"• Falx Synergy: Bleed Bonus: {falxBleedState}, Reach Boost: {falxRangeState}\n" +
                          $"• Bleed Damage: {bleedState}\n\n" +
                          $"Commands:\n" +
+                         $"  /bnh stealth [on|off]  (or /bnh sneak) - Toggle realistic stealth & animal FOV\n" +
                          $"  /bnh xray [animals|monsters|all] [on|off]  (or /bnh scent) - Hunter's scent tracking\n" +
                          $"  /bnh betterrange [on|off]  (or /bnh sweep) - Melee attack assist cone\n" +
                          $"  /bnh falx [bleed|range|both] [on|off] - Configure falx weapon bonuses\n" +
@@ -282,6 +292,31 @@ namespace BleedAndHunt
             return TextCommandResult.Error("Usage: /bnh falx [on|off] or /bnh falx [bleed|range|both] [on|off]");
         }
 
+        private TextCommandResult OnBnhStealth(TextCommandCallingArgs args)
+        {
+            string? arg = args.RawArgs.PopWord()?.ToLowerInvariant();
+            if (string.IsNullOrEmpty(arg))
+            {
+                Config.EnableStealthMechanics = !Config.EnableStealthMechanics;
+            }
+            else if (arg == "on" || arg == "true")
+            {
+                Config.EnableStealthMechanics = true;
+            }
+            else if (arg == "off" || arg == "false")
+            {
+                Config.EnableStealthMechanics = false;
+            }
+            else
+            {
+                return TextCommandResult.Error("Usage: /bnh stealth [on|off]");
+            }
+
+            SaveConfig();
+            string state = Config.EnableStealthMechanics ? "ENABLED" : "DISABLED";
+            return TextCommandResult.Success($"[Bleed & Hunt] Realistic stealth & animal FOV mechanics are now {state}.");
+        }
+
         public static void SaveConfig()
         {
             try
@@ -359,6 +394,17 @@ namespace BleedAndHunt
         {
             base.StartServerSide(sapi);
 
+            // Apply Harmony patches for realistic stealth & FOV mechanics
+            try
+            {
+                harmony = new Harmony("bleedandhunt");
+                StealthPatch.ApplyPatches(harmony, sapi.Logger);
+            }
+            catch (Exception ex)
+            {
+                sapi.Logger.Error("[Bleed & Hunt] Failed to initialize Harmony stealth patches: " + ex.Message);
+            }
+
             // Fallback safety: dynamically attach behavior when entities are loaded or spawned
             sapi.Event.OnEntityLoaded += EnsureBehaviorAttached;
             sapi.Event.OnEntitySpawn += EnsureBehaviorAttached;
@@ -406,6 +452,13 @@ namespace BleedAndHunt
 
             weaponSweep?.Dispose();
             weaponSweep = null;
+
+            try
+            {
+                harmony?.UnpatchAll("bleedandhunt");
+                harmony = null;
+            }
+            catch {}
 
             base.Dispose();
         }
