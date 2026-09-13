@@ -48,7 +48,7 @@ namespace BleedAndHunt
             if (now - lastSweepAttackMs < 280) return;
 
             // Determine weapon attack reach
-            float attackReach = activeSlot.Itemstack.Collectible.AttackRange;
+            float attackReach = activeSlot.Itemstack.Collectible.GetAttackRange(activeSlot.Itemstack);
             if (attackReach <= 0.1f)
             {
                 attackReach = code.Contains("spear") ? 3.5f : (code.Contains("falx") ? 3.0f : 2.0f);
@@ -56,16 +56,33 @@ namespace BleedAndHunt
 
             // Find best target within lateral sweep cone
             Entity? target = FindSweepTarget(player.Entity, attackReach, config.BetterRangeSweepAngle);
-            if (target != null)
+            if (target != null && target.SelectionBox != null)
             {
                 lastSweepAttackMs = now;
+                var box = target.SelectionBox;
+                double boxMidY = (box.Y1 + box.Y2) * 0.5;
+                Vec3d eyePos = player.Entity.Pos.XYZ.AddCopy(player.Entity.LocalEyePos);
+                Vec3d targetCenter = target.Pos.XYZ.AddCopy(0, boxMidY, 0);
+
                 var selection = new EntitySelection
                 {
                     Entity = target,
-                    Position = target.Pos.XYZ
+                    Position = target.Pos.XYZ,
+                    HitPosition = new Vec3d(0, boxMidY, 0),
+                    Face = BlockFacing.FromVector(eyePos.SubCopy(targetCenter)) ?? BlockFacing.UP,
+                    SelectionBoxIndex = 0
                 };
-                capi.World.TryAttackEntity(selection);
-                handled = EnumHandling.PreventDefault;
+
+                try
+                {
+                    capi.World.TryAttackEntity(selection);
+                    player.Entity.AnimManager?.StartAnimation("attack");
+                    handled = EnumHandling.PreventDefault;
+                }
+                catch (Exception ex)
+                {
+                    capi.World.Logger.Warning("[BleedAndHunt] Error during weapon sweep attack: {0}", ex);
+                }
             }
         }
 
@@ -94,8 +111,10 @@ namespace BleedAndHunt
                     if (!EntityHelper.IsAnimal(entity) && entity is not EntityAgent) continue;
 
                     // Center of target bounding box
-                    var box = entity.SelectionBox ?? entity.CollisionBox;
-                    double boxMidY = box != null ? (box.Y1 + box.Y2) * 0.5 : 0.5;
+                    var box = entity.SelectionBox;
+                    if (box == null) continue;
+
+                    double boxMidY = (box.Y1 + box.Y2) * 0.5;
                     Vec3d targetCenter = entity.Pos.XYZ.AddCopy(0, boxMidY, 0);
 
                     double distSq = eyePos.SquareDistanceTo(targetCenter);
