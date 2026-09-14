@@ -98,7 +98,7 @@ namespace BleedAndHunt
             string falxRangeState = Config.EnableFalxRangeBoost ? "ON" : "OFF";
             int opacityPercent = (int)Math.Round(Config.XRayColorA * 100f);
 
-            string msg = $"[Bleed & Hunt v1.2.0] Settings & Status:\n" +
+            string msg = $"[Bleed & Hunt v1.2.1] Settings & Status:\n" +
                          $"• Hunter's Scent: {xrayState} (Targeting: {Config.XRayTargetFilter}, Range: {Config.XRayMaxDistance}m, Opacity: {opacityPercent}%)\n" +
                          $"• Melee Sweep: {rangeState} (Assist Angle: {Config.BetterRangeSweepAngle}°)\n" +
                          $"• Falx Synergy: Bleed Bonus: {falxBleedState}, Reach Boost: {falxRangeState}\n" +

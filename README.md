@@ -5,7 +5,7 @@
 # 🩸 Bleed & Hunt
 ### *Visceral Wounds • Blood Trail Tracking • Prey Limping • Melee Sweeps*
 
-[![Release](https://img.shields.io/badge/Release-v1.2.0-e62020?style=for-the-badge&logo=git&logoColor=white)](https://github.com/Shurielx/Bleed-Hunt/releases)
+[![Release](https://img.shields.io/badge/Release-v1.2.1-e62020?style=for-the-badge&logo=git&logoColor=white)](https://github.com/Shurielx/Bleed-Hunt/releases)
 [![Vintage Story](https://img.shields.io/badge/Vintage%20Story-1.22.*-8B4513?style=for-the-badge&logo=curseforge&logoColor=white)](https://mods.vintagestory.at/)
 [![Platform](https://img.shields.io/badge/Platform-Client%20%26%20Server-232a30?style=for-the-badge)](https://github.com/Shurielx/Bleed-Hunt)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512bd4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
@@ -31,7 +31,7 @@
 * 🐾 **Dynamic Blood Trails:** Wounded animals drop faint, glowing red voxel blood droplets onto the ground, leaving an unmistakable trail to track through dense grass and brush.
 * 👁️ **Hunter's Scent Vision:** Injured prey is highlighted through foliage and terrain with a subtle crimson outline for 30 seconds (up to 64 blocks away), giving you true hunter instincts.
 * 🦵 **Limping & Execute Damage:** Prey slows down progressively as its vitality drains (down to 50% speed at low health) and takes **1.25x execute bonus damage** when wounded below half health.
-* 🎯 **Golden Kill Marker:** Downed game emits a soft golden diamond beacon for 10 seconds, ensuring your harvest is never lost in tall autumn grass or murky swamps.
+* 🎯 **Golden 3D Cone Marker:** Downed game emits an animated, rotating 3D golden cone beacon pointing directly to the quarry for 10 seconds, ensuring your harvest is never lost in tall autumn grass or murky swamps.
 * ⚔️ **Forgiving Melee Sweep Cone:** Swords, knives, falx blades, and spears feature a 22° attack cone assist so agile targets aren't missed by a pixel.
 * 🗡️ **Falx Synergy & Reach:** Falx weapons inflict **+50% bonus bleed damage** over time and gain extended forward reach (3.0m). Both bonuses can be toggled via chat commands or the ConfigKit GUI.
 * 🚀 **Zero-Overhead Performance:** Ultra-efficient architecture with zero-cost idle state (returns in 1 nanosecond for untargeted mobs) and 5Hz low-frequency cached rendering.

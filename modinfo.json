@@ -4,7 +4,7 @@
   "name": "Bleed & Hunt",
   "authors": ["Shuriel"],
   "description": "Hunting and combat overhaul: weapon-tier bleeding damage over time, wounded animal limping, hunter's blood scent tracking, melee sweep cone assist, and extended reach for falx blades.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "dependencies": {
     "game": "1.22.*"
   }

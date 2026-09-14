@@ -11,12 +11,14 @@ namespace BleedAndHunt
     {
         private readonly ICoreClientAPI capi;
         private MeshRef? boxMeshRef;
+        private MeshRef? coneMeshRef;
         private LoadedTexture? whiteTexture;
         private readonly float[] modelMatrix = Mat4f.Create();
 
         // Cached shader light vectors to avoid per-frame GC allocations
         private static readonly Vec4f FullLight = new Vec4f(1.0f, 1.0f, 1.0f, 1.0f);
         private static readonly Vec3f FullAmbient = new Vec3f(1.0f, 1.0f, 1.0f);
+        private static readonly Vec4f ZeroGlow = new Vec4f(0.0f, 0.0f, 0.0f, 0.0f);
         private readonly Vec4f livingTint = new Vec4f();
         private readonly Vec4f corpseTint = new Vec4f();
 
@@ -34,9 +36,17 @@ namespace BleedAndHunt
             InitMeshes();
         }
 
+        private void EnsureWhiteTexture()
+        {
+            if (whiteTexture != null && whiteTexture.TextureId > 0) return;
+
+            whiteTexture = new LoadedTexture(capi, 0, 1, 1);
+            capi.Render.LoadOrUpdateTextureFromRgba(new int[] { unchecked((int)0xFFFFFFFF) }, false, 0, ref whiteTexture);
+        }
+
         private void InitMeshes()
         {
-            // Solid cube mesh (-1 to 1) with white vertex colors and full glow
+            // 1. Solid cube mesh (-1 to 1) with white vertex colors and 0 glow flags
             MeshData cubeMesh = CubeMeshUtil.GetCube();
             if (cubeMesh.Rgba == null || cubeMesh.Rgba.Length != cubeMesh.VerticesCount * 4)
             {
@@ -48,24 +58,83 @@ namespace BleedAndHunt
             {
                 cubeMesh.Flags = new int[cubeMesh.VerticesCount];
             }
-            // Set full glow in vertex flags so standard shader never treats it as dark
-            for (int i = 0; i < cubeMesh.Flags.Length; i++)
-            {
-                cubeMesh.Flags[i] = 255;
-            }
+            Array.Fill(cubeMesh.Flags, 0);
 
             boxMeshRef = capi.Render.UploadMesh(cubeMesh);
 
-            // 1x1 pure white RGBA texture (0xFFFFFFFF)
-            whiteTexture = new LoadedTexture(capi);
-            capi.Render.LoadOrUpdateTextureFromRgba(new int[] { unchecked((int)0xFFFFFFFF) }, false, 0, ref whiteTexture);
+            // 2. Inverted 3D cone mesh for corpse beacon (tip pointing down at carcass)
+            MeshData coneMesh = CreateConeMesh();
+            coneMeshRef = capi.Render.UploadMesh(coneMesh);
+
+            // 3. 1x1 pure white RGBA texture (0xFFFFFFFF)
+            EnsureWhiteTexture();
+        }
+
+        private MeshData CreateConeMesh(int segments = 16, float radius = 0.32f, float bodyHeight = 0.85f, float peakHeight = 0.95f)
+        {
+            int totalVerts = 1 + segments + 1;
+            int totalIndices = segments * 6 * 2; // Double-sided for both body and top cap
+
+            MeshData mesh = new MeshData(totalVerts, totalIndices, false, true, true, true);
+
+            // Vertex 0: Bottom tip pointing down
+            mesh.AddVertexWithFlags(0f, 0f, 0f, 0.5f, 0.5f, -1, 0);
+
+            // Vertices 1..segments: Ring at bodyHeight
+            for (int i = 0; i < segments; i++)
+            {
+                double angle = i * 2.0 * Math.PI / segments;
+                float x = (float)(Math.Cos(angle) * radius);
+                float z = (float)(Math.Sin(angle) * radius);
+                mesh.AddVertexWithFlags(x, bodyHeight, z, 0.5f, 0.5f, -1, 0);
+            }
+
+            // Vertex segments + 1: Top cap peak
+            int topPeakIdx = segments + 1;
+            mesh.AddVertexWithFlags(0f, peakHeight, 0f, 0.5f, 0.5f, -1, 0);
+
+            // Cone body faces (tip to ring)
+            for (int i = 0; i < segments; i++)
+            {
+                int v1 = 1 + i;
+                int v2 = 1 + ((i + 1) % segments);
+
+                // Front face
+                mesh.AddIndex(0);
+                mesh.AddIndex(v1);
+                mesh.AddIndex(v2);
+
+                // Back face (double-sided)
+                mesh.AddIndex(0);
+                mesh.AddIndex(v2);
+                mesh.AddIndex(v1);
+            }
+
+            // Top cap faces (ring to top peak)
+            for (int i = 0; i < segments; i++)
+            {
+                int v1 = 1 + i;
+                int v2 = 1 + ((i + 1) % segments);
+
+                // Front face
+                mesh.AddIndex(topPeakIdx);
+                mesh.AddIndex(v2);
+                mesh.AddIndex(v1);
+
+                // Back face (double-sided)
+                mesh.AddIndex(topPeakIdx);
+                mesh.AddIndex(v1);
+                mesh.AddIndex(v2);
+            }
+
+            return mesh;
         }
 
         public void OnRenderFrame(float deltaTime, EnumRenderStage stage)
         {
             var config = BleedAndHuntModSystem.Config;
             if (config == null || !config.EnableXRay) return;
-            if (boxMeshRef == null) return;
+            if (boxMeshRef == null || coneMeshRef == null) return;
 
             IClientPlayer? player = capi.World.Player;
             if (player?.Entity == null) return;
@@ -82,11 +151,7 @@ namespace BleedAndHunt
             if (livingTargets.Count == 0 && corpseTargets.Count == 0) return;
 
             // Ensure white texture is valid
-            if (whiteTexture == null || whiteTexture.TextureId <= 0)
-            {
-                whiteTexture = new LoadedTexture(capi);
-                capi.Render.LoadOrUpdateTextureFromRgba(new int[] { unchecked((int)0xFFFFFFFF) }, false, 0, ref whiteTexture);
-            }
+            EnsureWhiteTexture();
 
             Vec3d camPos = player.Entity.CameraPos;
             float maxDist = config.XRayMaxDistance;
@@ -224,18 +289,15 @@ namespace BleedAndHunt
             var prog = capi.Render.PreparedStandardShader((int)entity.Pos.X, (int)entity.Pos.Y + 1, (int)entity.Pos.Z);
             if (prog == null) return;
 
-            // Force emissive glow so the box is NEVER darkened by underground / night lighting
+            EnsureWhiteTexture();
+            prog.Tex2D = whiteTexture!.TextureId;
             prog.RgbaLightIn = FullLight;
             prog.RgbaAmbientIn = FullAmbient;
-            prog.ExtraGlow = 255;
+            prog.RgbaGlowIn = ZeroGlow;
+            prog.ExtraGlow = 0;
             prog.NormalShaded = 0;
             prog.ProjectionMatrix = capi.Render.CurrentProjectionMatrix;
             prog.ViewMatrix = capi.Render.CameraMatrixOriginf;
-
-            if (whiteTexture != null)
-            {
-                capi.Render.BindTexture2d(whiteTexture.TextureId);
-            }
 
             // Single clean bounding box on the living animal
             Mat4f.Identity(modelMatrix);
@@ -263,43 +325,43 @@ namespace BleedAndHunt
             float height = box != null ? box.Y2 : 0.6f;
             if (height <= 0.1f) height = 0.6f;
 
+            // Position tip hovering directly over the animal body
+            // Subtle, elegant vertical bobbing (+-6cm)
+            float bob = (float)Math.Sin(capi.World.ElapsedMilliseconds / 350.0) * 0.06f;
+            float tipY = (float)(entity.Pos.Y - camPos.Y + height + 0.35f + bob);
             float relX = (float)(entity.Pos.X - camPos.X);
             float relZ = (float)(entity.Pos.Z - camPos.Z);
-            float markerRelY = (float)(entity.Pos.Y - camPos.Y + height + 0.65f);
 
             var prog = capi.Render.PreparedStandardShader((int)entity.Pos.X, (int)entity.Pos.Y + 1, (int)entity.Pos.Z);
             if (prog == null) return;
 
+            EnsureWhiteTexture();
+            prog.Tex2D = whiteTexture!.TextureId;
             prog.RgbaLightIn = FullLight;
             prog.RgbaAmbientIn = FullAmbient;
-            prog.ExtraGlow = 255;
+            prog.RgbaGlowIn = ZeroGlow;
+            prog.ExtraGlow = 0;
             prog.NormalShaded = 0;
             prog.ProjectionMatrix = capi.Render.CurrentProjectionMatrix;
             prog.ViewMatrix = capi.Render.CameraMatrixOriginf;
 
-            if (whiteTexture != null)
-            {
-                capi.Render.BindTexture2d(whiteTexture.TextureId);
-            }
-
-            // Rotating diamond beacon floating above corpse for 10s so player can easily locate kill
-            float markerScale = 0.22f;
+            // Rotating 3D cone beacon pointing down at the carcass
+            float rotY = (float)(capi.World.ElapsedMilliseconds / 500.0);
             Mat4f.Identity(modelMatrix);
-            Mat4f.Translate(modelMatrix, modelMatrix, relX, markerRelY, relZ);
-            Mat4f.RotateY(modelMatrix, modelMatrix, (float)(capi.World.ElapsedMilliseconds / 300.0));
-            Mat4f.Scale(modelMatrix, modelMatrix, markerScale, markerScale * 1.5f, markerScale);
+            Mat4f.Translate(modelMatrix, modelMatrix, relX, tipY, relZ);
+            Mat4f.RotateY(modelMatrix, modelMatrix, rotY);
             prog.ModelMatrix = modelMatrix;
 
-            // Warm amber gold glow
+            // Warm golden amber glow
             corpseTint.X = config.CorpseColorR;
             corpseTint.Y = config.CorpseColorG;
             corpseTint.Z = config.CorpseColorB;
             corpseTint.W = config.CorpseColorA;
             prog.RgbaTint = corpseTint;
 
-            if (boxMeshRef != null)
+            if (coneMeshRef != null)
             {
-                capi.Render.RenderMesh(boxMeshRef);
+                capi.Render.RenderMesh(coneMeshRef);
             }
 
             prog.Stop();
@@ -314,6 +376,12 @@ namespace BleedAndHunt
             {
                 capi.Render.DeleteMesh(boxMeshRef);
                 boxMeshRef = null;
+            }
+
+            if (coneMeshRef != null)
+            {
+                capi.Render.DeleteMesh(coneMeshRef);
+                coneMeshRef = null;
             }
 
             whiteTexture?.Dispose();

@@ -19,3 +19,4 @@ desktop.ini
 
 # Temporary scratch files
 scratch/
+*.log
